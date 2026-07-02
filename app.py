@@ -4,7 +4,7 @@ import numpy as np
 import requests
 
 API_URL = st.sidebar.text_input("Backend API URL", value="http://localhost:5000/api/eeg/latest")
-
+#test
 if st.sidebar.button("Fetch Data"):
     try:
         response = requests.get(API_URL, timeout=5)
