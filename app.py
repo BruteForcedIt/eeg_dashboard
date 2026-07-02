@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 import requests
+import time
 
 API_URL = st.sidebar.text_input("Backend API URL", value="http://localhost:5000/api/eeg/latest")
 #test
@@ -15,6 +16,19 @@ if st.sidebar.button("Fetch Data"):
     except requests.exceptions.RequestException as e:
         st.error(f"Could not reach API: {e}")
 
+placeholder = st.empty()
+
+for _ in range(1000):  # loop limit so it doesn't run forever
+    try:
+        data = requests.get(API_URL, timeout=5).json()
+        with placeholder.container():
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(y=data["amplitude"], mode="lines", name="EEG Amplitude"))
+            st.plotly_chart(fig, use_container_width=True)
+    except requests.exceptions.RequestException:
+        st.error("API unreachable")
+    time.sleep(1)
+    
 # Page configuration
 st.set_page_config(
     page_title="EEG Dashboard",
@@ -57,3 +71,4 @@ st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Frequency Band Breakdown")
 st.info("Bar chart for Delta / Theta / Alpha / Beta bands coming in Week 6.")
+
