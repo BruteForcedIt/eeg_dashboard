@@ -4,8 +4,13 @@ import numpy as np
 import requests
 import time
 
-API_URL = st.sidebar.text_input("Backend API URL", value="http://localhost:5000/api/eeg/latest")
-#test
+# Page configuration
+st.set_page_config(
+    page_title="EEG Dashboard",
+    layout="wide"
+)
+
+API_URL = st.sidebar.text_input("Backend API URL", value="http://127.0.0.1:5000/api/eeg/latest")
 if st.sidebar.button("Fetch Data"):
     try:
         response = requests.get(API_URL, timeout=5)
@@ -15,25 +20,6 @@ if st.sidebar.button("Fetch Data"):
         st.json(data)
     except requests.exceptions.RequestException as e:
         st.error(f"Could not reach API: {e}")
-
-placeholder = st.empty()
-
-for _ in range(1000):  # loop limit so it doesn't run forever
-    try:
-        data = requests.get(API_URL, timeout=5).json()
-        with placeholder.container():
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(y=data["amplitude"], mode="lines", name="EEG Amplitude"))
-            st.plotly_chart(fig, use_container_width=True)
-    except requests.exceptions.RequestException:
-        st.error("API unreachable")
-    time.sleep(1)
-    
-# Page configuration
-st.set_page_config(
-    page_title="EEG Dashboard",
-    layout="wide"
-)
 
 # ---- Header ----
 st.title("Real-Time EEG Dashboard")
