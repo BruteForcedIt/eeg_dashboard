@@ -179,7 +179,6 @@ for ch in CH_NAMES:
 region_options = [r for r in ["Frontal", "Central", "Temporal", "Parietal", "Occipital", "Other"] if r in region_map]
 
 region_choice = st.sidebar.multiselect("Brain regions to display", options=region_options, default=region_options)
-st.sidebar.caption("Topomap always shows all channels — region filters only narrow the scrolling chart.")
 st.divider()
 
 selected_channels = [ch for ch in CH_NAMES if classify_region(ch) in region_choice] or CH_NAMES
