@@ -1,6 +1,5 @@
 """
-Real-Time EEG Monitoring Dashboard
-NeuroLab Internship — Student 4: Visualization Engineer
+EEG Monitoring Dashboard
 
 v3 changes:
 - No hardcoded sampling rate or channel count/list anymore. Both are
@@ -59,10 +58,6 @@ def pick_channel_names(n_channels):
 
 
 def classify_region(ch):
-    """Buckets any standard 10-10/10-20 channel name into one of 5 broad
-    regions by name prefix. Boundary electrodes (FC/FT/CP/PO) are assigned
-    to their nearest primary region — a common simplification, not a strict
-    anatomical atlas."""
     c = ch.upper()
     if c.startswith("FP") or c.startswith("AF"):
         return "Frontal"
@@ -91,8 +86,6 @@ def classify_region(ch):
 
 @st.cache_resource
 def get_montage_for(ch_names):
-    """Tries standard_1005 (343-name superset covering virtually any 10-10
-    cap) and only keeps positions for channels that actually match."""
     montage = mne.channels.make_standard_montage("standard_1005")
     return montage
 
@@ -107,8 +100,6 @@ def build_info(ch_names, sfreq):
 @st.cache_resource
 def load_raw_data(n_channels, sfreq, duration_sec=60):
     """
-    Loads the 'original' raw EEG recording as an MNE Raw object.
-
     TODO once Student 3's API is live: replace this function's body with
     the real fetch/parse (e.g. requests.get(...).json()), building a
     (n_channels, n_samples) array the same way, then:
@@ -149,10 +140,10 @@ def dynamic_downsample(arr, threshold=DOWNSAMPLE_THRESHOLD):
 # ============================================================
 # HEADER
 # ============================================================
-st.title("EEG Dashboard")
+st.title("EEG Monitoring Dashboard")
 
 # ============================================================
-# SIDEBAR — data format is fully configurable, nothing hardcoded.
+# SIDEBAR
 # Defaults match what Student 3 reported (160Hz, 64 channels) but
 # either can be changed to match whatever the real API ends up sending.
 # ============================================================
@@ -162,7 +153,7 @@ sfreq = st.sidebar.number_input("Sampling rate (Hz)", min_value=32, max_value=10
 
 st.sidebar.header("Display Controls")
 window_sec = st.sidebar.slider("Sweep window (seconds)", 1, 10, 4)
-band_choice = st.sidebar.selectbox("Topomap frequency band", ["Alpha", "Beta", "Gamma", "Broadband (no filter)"])
+band_choice = st.sidebar.selectbox("Topomap frequency band", ["Alpha", "Beta", "Gamma", "Broadband"])
 topo_refresh = st.sidebar.slider("Topomap refresh interval (s)", 0.5, 3.0, 1.0, 0.5)
 
 RAW = load_raw_data(n_channels, sfreq)
@@ -328,17 +319,17 @@ def live_topomap():
     idx = np.arange(pos - window_samples, pos) % TOTAL_SAMPLES
 
     st.subheader("Topographic Map")
-    if band_choice != "Broadband (no filter)" and len(idx) < MIN_SAMPLES_FOR_FILTER:
+    if band_choice != "Broadband" and len(idx) < MIN_SAMPLES_FOR_FILTER:
         st.info(f"Collecting data for {band_choice} filtering — need ~2s of signal.")
         return
 
     recognized_idx = [CH_NAMES.index(ch) for ch in RECOGNIZED]
     chan_data_uv = RAW_DATA[recognized_idx][:, idx] * 1e6
 
-    if band_choice == "Broadband (no filter)":
+    if band_choice == "Broadband":
         power = np.mean(np.abs(chan_data_uv), axis=1)
         cbar_label = "µV"
-        caption = "Average signal amplitude across the scalp (unfiltered)"
+        caption = "Average signal amplitude across the scalp"
     else:
         lo, hi = BANDS[band_choice]
         filtered = mne.filter.filter_data(chan_data_uv, sfreq, lo, hi, verbose=False)
