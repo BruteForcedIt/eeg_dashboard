@@ -298,8 +298,6 @@ def render_sweep_monitor(channels, window_sec, height_per_channel=34):
 
 
 st.subheader("Live Multi-Channel EEG Signal")
-st.caption(f"{len(selected_channels)} channels · {sfreq} Hz · {window_sec}s sweep · "
-           f"{' + '.join(region_choice) if region_choice else 'All regions'} ")
 render_sweep_monitor(selected_channels, window_sec)
 
 
