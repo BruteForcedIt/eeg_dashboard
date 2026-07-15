@@ -1,54 +1,3 @@
-"""
-EEG Monitoring Dashboard  (v4)
-
-WHAT CHANGED FROM v3
----------------------
-1. Real data source: pulls from MongoDB (Student 3's database) instead of
-   only mock data. If Mongo is unreachable or empty, it automatically
-   falls back to the same mock generator as before, so the app never
-   goes blank during a demo.
-2. "Custom" channels (names that don't match a known 10-20/10-10 montage,
-   so they can't be placed on a topomap) are no longer just dropped —
-   their signal still shows up in the Session Report at the bottom.
-3. Layout: on a normal laptop/desktop screen the sweep chart sits on the
-   LEFT and the topomap grid sits on the RIGHT. On a narrow (mobile)
-   screen, Streamlit's columns automatically stack — chart on top,
-   topomaps below on scroll. No custom CSS needed for this; it's native
-   `st.columns` behavior.
-4. One topomap per band (Delta/Theta/Alpha/Beta/Gamma) plus Broadband,
-   all shown at once in a small grid — no more dropdown filter.
-5. Multiple MongoDB documents = multiple files from the SAME patient's
-   recording, split on upload. They're sorted and stitched end-to-end
-   into one continuous buffer, so the sweep chart flows across file
-   boundaries instead of jumping between separate "datasets".
-6. The sweep chart used to draw a JS-side sine formula that had nothing
-   to do with the real data. It now draws real sample values (down-
-   sampled for payload size) and interpolates between them in the
-   browser, so it's actually the signal, not a lookalike.
-7. New "Session Report" section: combines basic app-usage info with a
-   plain-language, research-based read of which brainwave bands are
-   dominant. This is a general wellness-style indicator, NOT a clinical
-   or diagnostic statement.
-
-SECURITY NOTE FOR BOSS
------------------------
-The Mongo connection string below contains a real password. Since your
-deploy workflow pushes this file to GitHub, that password would be
-exposed publicly. Before pushing, move MONGO_URI into Streamlit Cloud's
-"Secrets" (Settings > Secrets) as `MONGO_URI = "..."` and this script
-will pick it up automatically via `st.secrets` (falls back to the
-hardcoded value for local testing only). Ideally, also ask Student 3 to
-rotate that password once it's out of chat/history.
-
-SCHEMA NOTE
------------
-I can't see your real MongoDB documents from here, so the field names
-below (CHANNEL_KEYS / SFREQ_KEYS / DATA_KEYS / ORDER_KEYS) are educated
-guesses. Run the app, open the sidebar "Debug: raw document fields"
-expander, and if the real field names differ, just add them to the
-matching list — nothing else needs to change.
-"""
-
 import os
 import json
 import time
@@ -65,9 +14,9 @@ from scipy.signal import decimate
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 
-# ============================================================
-# PAGE CONFIG — must be the first Streamlit command
-# ============================================================
+# ====================
+# PAGE CONFIGURATION
+# ====================
 st.set_page_config(page_title="EEG Dashboard", layout="wide")
 st.markdown("<style>section.main{overflow-anchor: none;}</style>", unsafe_allow_html=True)
 
@@ -83,11 +32,9 @@ BAND_DESCRIPTIONS = {
     "Gamma": "activity sometimes linked to high-level cognitive processing or focus",
 }
 
-# ============================================================
+# ====================
 # MONGODB CONNECTION
-# Defaults match what Student 3 shared. Override via Streamlit secrets
-# (preferred for anything pushed to GitHub) or environment variables.
-# ============================================================
+# ====================
 def _get_secret_or_env(key, default):
     try:
         if key in st.secrets:
@@ -103,8 +50,7 @@ MONGO_URI = _get_secret_or_env(
 MONGO_DB_NAME = _get_secret_or_env("MONGO_DB", "eeg_dataset_server")
 MONGO_COLLECTION = "datasets"
 
-# Guessed document field names — adjust here if the sidebar debug panel
-# shows different real names.
+# Guessed document field names
 CHANNEL_KEYS = ["channels", "channel_names", "ch_names"]
 SFREQ_KEYS = ["sampling_rate", "sfreq", "fs", "sample_rate"]
 DATA_KEYS = ["data", "eeg_data", "samples", "values"]
@@ -144,7 +90,7 @@ def _first_present(doc, candidate_keys):
 
 def build_raw_from_documents(docs):
     """
-    Stitches every document into ONE continuous (channels, samples) array,
+    Stitches every document into one continuous (channels, samples) array,
     in sequence — e.g. cluster0's chunk 1, then chunk 2, etc. Multiple
     files are treated as one patient's split recording, not separate
     datasets to pick between.
@@ -190,9 +136,9 @@ def build_raw_from_documents(docs):
     return full, list(ch_names), float(sfreq), len(chunks)
 
 
-# ============================================================
+# =================================
 # CHANNEL NAMING / MONTAGE HELPERS
-# ============================================================
+# =================================
 @st.cache_resource
 def get_fallback_pool():
     return mne.channels.make_standard_montage("standard_1005").ch_names
@@ -278,9 +224,9 @@ def downsample_for_display(data_uv, target_points=CANVAS_POINT_BUDGET):
     return out
 
 
-# ============================================================
+# ========
 # HEADER
-# ============================================================
+# ========
 st.title("EEG Monitoring Dashboard")
 
 if "session_start" not in st.session_state:
@@ -291,9 +237,9 @@ if "regions_seen" not in st.session_state:
     st.session_state.regions_seen = set()
 st.session_state.refresh_count += 1
 
-# ============================================================
+# ======================
 # SIDEBAR — DATA SOURCE
-# ============================================================
+# ======================
 st.sidebar.header("Data Source")
 docs = fetch_dataset_documents()
 mongo_data, mongo_ch_names, mongo_sfreq, n_files = build_raw_from_documents(docs)
@@ -352,11 +298,6 @@ st.session_state.regions_seen |= set(region_choice)
 selected_channels = [ch for ch in CH_NAMES if classify_region(ch) in region_choice] or CH_NAMES
 st.divider()
 
-# ============================================================
-# LEFT/RIGHT LAYOUT
-# st.columns stacks automatically on narrow (mobile) screens — chart
-# first, topomaps below on scroll — so no separate mobile logic needed.
-# ============================================================
 col_chart, col_topo = st.columns([3, 2])
 
 # ------------------------------------------------------------
@@ -471,11 +412,9 @@ with col_chart:
     display_sfreq = sfreq * display_data.shape[1] / RAW_DATA.shape[1]
     render_sweep_monitor(selected_channels, display_data, display_sfreq, window_sec)
 
-# ------------------------------------------------------------
-# RIGHT: one small topomap per band, refreshed periodically via
-# st.fragment (unchanged design choice from v3 — real clinical
-# monitors also refresh topomaps as discrete snapshots).
-# ------------------------------------------------------------
+# ----------
+# TOPOMAPS
+# ----------
 if "topo_pos" not in st.session_state:
     st.session_state.topo_pos = 0
 
@@ -545,11 +484,9 @@ with col_topo:
 
 st.divider()
 
-# ============================================================
-# SESSION REPORT — combined app-usage + brainwave-state summary.
-# General, research-based wellness indicator — NOT a clinical or
-# diagnostic assessment.
-# ============================================================
+# ===============
+# SESSION REPORT
+# ===============
 st.subheader("Session Report")
 
 analysis_window = min(TOTAL_SAMPLES, int(min(60, TOTAL_SAMPLES / sfreq) * sfreq))
